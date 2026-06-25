@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/29320148/README.md)
 # LinkedIn Job Scraper → Google Sheets
 
 Scrapes Singapore job listings via two methods and writes results into a Google Sheet with 4 tabs, per your spec. Sends a notification email after each run.
@@ -20,9 +19,11 @@ Scrapes Singapore job listings via two methods and writes results into a Google 
 **Solid (clean API parameters):**
 - Full-time only (`employment_types=FULLTIME`)
 - Singapore-located (`job_country == 'SG'` or city match)
+- LinkedIn-only source (`"via linkedin"` appended to every query — restricts JSearch's own results at the source, rather than filtering after the fact)
 
 **Approximate (no clean API flag exists for this — built as best-effort keyword matching):**
 - **Staffing/contracting agency exclusion** — matches employer name against a blocklist in `scripts/reference_data.json` (Randstad, Adecco, Michael Page, PERSOLKELLY, Recruit Express, etc., both global and Singapore-specific firms). Catches the well-known ones; an obscure boutique agency could slip through.
+- **Publisher safety net** — even with `"via linkedin"` in the query, a post-fetch check (`is_acceptable_publisher` in `jsearch_utils.py`) verifies `job_publisher` is either LinkedIn or the employer's own name (e.g. "United Airlines Jobs" for United Airlines), catching any non-LinkedIn result that might leak through the query-level restriction. Excludes third-party boards like JobStreet, MyCareersFuture, and Trabajo, which tend to mirror postings later than the original source. Employer names under 3 characters are excluded from the "own site" half of this check to avoid false-positive substring matches — see Known Limitations.
 
 **Filters considered and deliberately not implemented:**
 - **Company-headquarters location (e.g. exclude SEA-headquartered companies)** — neither JSearch nor any free-tier company-data API could support this reliably at this scrape volume. JSearch has no HQ field at all. A live lookup via Glassdoor's company-data API (same provider as JSearch) does expose `headquarters_location`, but needs ~2 calls per unique new employer (company-search + company-overview) to resolve — at Tab 1a's volume this was estimated at ~390 calls/month against that API's 100/month free cap, a 4x overshoot with real uncertainty in the estimate itself (unique-employer count isn't predictable in advance). Decided to skip this filter entirely rather than build on a quota likely to fail in practice — review and remove unwanted listings manually in the sheet instead.
@@ -101,4 +102,5 @@ scripts/
 2. **Tab 1a (keyword search) has no company-HQ or geographic-presence filter at all.** It will surface jobs from companies headquartered anywhere, including Southeast Asia. You'll need to review and manually remove unwanted listings — the sheet's "Company" column is there for exactly this.
 3. **Qualifications text is whatever JSearch/LinkedIn exposes via `job_highlights`,** not a guaranteed clean extraction — some postings will have rich structured bullets, others will fall back to a raw description excerpt.
 4. **Tab 2a (target company scrape) has no business-vs-technical role filter.** Every role type at each target company will appear, including engineering/technical roles.
+5. **Publisher filtering has a short-name blind spot.** Both tabs now restrict results to LinkedIn or the employer's own careers site (excluding JobStreet, MyCareersFuture, Trabajo, etc.), but the "employer's own site" check requires the employer name to be at least 3 characters to avoid false-positive substring matches. This means a company with a very short name (e.g. "EA") will only show up via LinkedIn — its own direct careers-site postings won't pass the filter, since "EA" is too short to safely match against a publisher name without risking unrelated false matches.
 5. **This hasn't been run end-to-end against live APIs** from this environment (sandbox network restrictions block the relevant domains) — verify via `workflow_dispatch` before trusting the schedule.
