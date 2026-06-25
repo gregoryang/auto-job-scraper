@@ -11,7 +11,14 @@ import time
 import requests
 
 JSEARCH_HOST = "jsearch.p.rapidapi.com"
-JSEARCH_URL = f"https://{JSEARCH_HOST}/search"
+# Confirmed via live test against the actual RapidAPI subscription
+# (2026-06-24): the "Job Search" endpoint on the current API version (v5)
+# is at /search-v2, not /search. /search returns a 404 ("Endpoint '/search'
+# does not exist") even though headers/auth/params are otherwise unchanged.
+# Response shape (job_id, job_title, employer_name, job_highlights, etc.)
+# is identical to what's documented for /search, plus an added `cursor`
+# field for pagination that we don't use (single page only).
+JSEARCH_URL = f"https://{JSEARCH_HOST}/search-v2"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REFERENCE_PATH = os.path.join(HERE, "reference_data.json")
