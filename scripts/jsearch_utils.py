@@ -36,7 +36,18 @@ def is_staffing_agency(employer_name, blocklist):
 
 
 def search_jsearch(api_key, query, employment_types="FULLTIME", date_posted="today"):
-    """Single JSearch call. Returns the raw 'data' list from the response."""
+    """
+    Single JSearch call. Returns a list of job dicts.
+
+    /search-v2's response shape differs from the older /search: the top-level
+    "data" field is an object containing a "jobs" array plus a "cursor"
+    string for pagination, not a flat list of job objects directly. Handle
+    both shapes defensively since we can't fully verify this from a sandbox
+    that can't reach the live API — fall back to treating "data" as the job
+    list itself if "jobs" isn't present, but always filter out any non-dict
+    entries so a stray string (e.g. a misplaced cursor) can't crash the
+    job.get(...) calls downstream.
+    """
     headers = {"x-rapidapi-key": api_key, "x-rapidapi-host": JSEARCH_HOST}
     params = {
         "query": query,
@@ -49,7 +60,22 @@ def search_jsearch(api_key, query, employment_types="FULLTIME", date_posted="tod
     if resp.status_code != 200:
         print(f"  [WARN] query '{query}' failed: HTTP {resp.status_code} - {resp.text[:200]}")
         return []
-    return resp.json().get("data", [])
+
+    body = resp.json()
+    data = body.get("data", [])
+
+    if isinstance(data, dict):
+        jobs = data.get("jobs", [])
+    else:
+        jobs = data
+
+    if not isinstance(jobs, list):
+        print(f"  [WARN] query '{query}' returned unexpected data shape: {type(jobs)}")
+        return []
+
+    # Defensive filter: only keep dict entries, in case of any stray
+    # non-job values (e.g. a misplaced cursor string) mixed into the list.
+    return [j for j in jobs if isinstance(j, dict)]
 
 
 def is_singapore_job(job):
