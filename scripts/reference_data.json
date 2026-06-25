@@ -1,0 +1,17 @@
+{
+  "_comment": "Reference data for filtering. Edit freely — these lists are deliberately not exhaustive; they catch the obvious/common cases, not every possible match. Matching is substring-based and case-insensitive against the employer name returned by JSearch.",
+
+  "staffing_agency_blocklist": [
+    "Randstad", "Adecco", "ManpowerGroup", "Manpower", "Robert Half",
+    "Kelly Services", "Kelly OCG", "TEKsystems", "Aerotek", "Allegis",
+    "Michael Page", "PageGroup", "Hays", "Korn Ferry", "Kforce",
+    "Insight Global", "Express Employment Professionals", "Lucas Group",
+    "LaSalle Network", "Akkodis", "LHH", "Experis", "Morgan McKinley",
+    "Robert Walters", "JAC Recruitment", "PERSOLKELLY", "PERSOL", "Persol",
+    "Recruit Express", "RGF", "Reeracoen", "EPS Consultants",
+    "Maxim Healthcare", "Aya Healthcare", "Aquent", "Toptal",
+    "Capita", "Ace Recruiters", "Horizon Recruitment", "ConnectOne",
+    "Charterhouse", "Cornerstone Global Partners", "RecruitFirst",
+    "GMP Recruitment", "Achieve Group", "The Resource Group"
+  ]
+}
