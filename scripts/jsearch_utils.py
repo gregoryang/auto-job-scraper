@@ -35,6 +35,43 @@ def is_staffing_agency(employer_name, blocklist):
     return any(agency.lower() in name_lower for agency in blocklist)
 
 
+def is_acceptable_publisher(job_publisher, employer_name):
+    """
+    Restrict results to LinkedIn or the employer's own careers site,
+    excluding third-party job boards (JobStreet, MyCareersFuture, Trabajo,
+    etc.) which tend to mirror postings later than the original source and
+    add noise rather than signal.
+
+    "Posted directly by the employer" is detected via job_publisher: when a
+    company publishes its own listing, JSearch's job_publisher tends to be
+    the company name plus a suffix like "Careers" or "Jobs" (e.g. "United
+    Airlines Jobs", "TEKsystems Careers") rather than an exact match to
+    employer_name — so this checks substring overlap in either direction,
+    not strict equality. This is approximate: an employer name that's a
+    very short/common word could theoretically match a publisher it
+    shouldn't (e.g. employer "EA" matching an unrelated publisher containing
+    "ea"), but for typical company names this is reliable enough.
+    """
+    if not job_publisher:
+        return False
+
+    publisher_lower = job_publisher.lower()
+
+    if "linkedin" in publisher_lower:
+        return True
+
+    if employer_name:
+        employer_lower = employer_name.lower().strip()
+        # Guard against very short employer names causing false-positive
+        # substring matches (e.g. "EA" matching almost anything).
+        if len(employer_lower) >= 3 and (
+            employer_lower in publisher_lower or publisher_lower in employer_lower
+        ):
+            return True
+
+    return False
+
+
 def search_jsearch(api_key, query, employment_types="FULLTIME", date_posted="today"):
     """
     Single JSearch call. Returns a list of job dicts.
@@ -56,7 +93,21 @@ def search_jsearch(api_key, query, employment_types="FULLTIME", date_posted="tod
         "employment_types": employment_types,
         "num_pages": "1",
     }
-    resp = requests.get(JSEARCH_URL, headers=headers, params=params, timeout=30)
+
+    try:
+        resp = requests.get(JSEARCH_URL, headers=headers, params=params, timeout=30)
+    except requests.exceptions.RequestException as e:
+        # One retry after a short pause — transient timeouts/connection
+        # resets often succeed on a second attempt. If it fails again,
+        # log and move on rather than crashing the whole run.
+        print(f"  [WARN] query '{query}' failed: network error - {e}. Retrying once...")
+        time.sleep(3)
+        try:
+            resp = requests.get(JSEARCH_URL, headers=headers, params=params, timeout=30)
+        except requests.exceptions.RequestException as e2:
+            print(f"  [WARN] query '{query}' failed again on retry: {e2}. Skipping.")
+            return []
+
     if resp.status_code != 200:
         print(f"  [WARN] query '{query}' failed: HTTP {resp.status_code} - {resp.text[:200]}")
         return []

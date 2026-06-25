@@ -12,6 +12,12 @@ take effect on the next scheduled run with no code/config changes needed.
 Filters applied:
   - Full-time only (JSearch employment_types=FULLTIME)
   - Excludes known staffing/contracting agencies (reference_data.json blocklist)
+  - LinkedIn only: query is scoped with "via linkedin" so JSearch only
+    returns LinkedIn-published results in the first place (excludes
+    JobStreet, MyCareersFuture, Trabajo, etc., which tend to mirror
+    postings later than the original and add stale noise). A post-fetch
+    publisher check is also applied as a safety net in case any
+    non-LinkedIn result leaks through despite the query scoping.
 
 No company-headquarters filter is applied here — JSearch doesn't expose
 HQ/headquarters data (only job-listing location), and a live lookup via a
@@ -28,7 +34,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from jsearch_utils import (
-    load_reference_data, is_staffing_agency,
+    load_reference_data, is_staffing_agency, is_acceptable_publisher,
     search_jsearch, is_singapore_job, extract_qualifications_text,
     rate_limit_pause,
 )
@@ -66,7 +72,7 @@ def main():
     seen_job_ids = set()
 
     for kw in keywords:
-        query = f"{kw} in Singapore"
+        query = f"{kw} in Singapore via linkedin"
         print(f"Searching: {query!r} ...")
         jobs = search_jsearch(api_key, query, employment_types="FULLTIME", date_posted="3days")
 
@@ -79,8 +85,11 @@ def main():
                 continue
 
             employer = job.get("employer_name") or ""
+            publisher = job.get("job_publisher") or ""
 
             if is_staffing_agency(employer, blocklist):
+                continue
+            if not is_acceptable_publisher(publisher, employer):
                 continue
 
             seen_job_ids.add(job_id)
